@@ -1,0 +1,123 @@
+#1. Pick the Source File
+import pandas as pd
+# Load the data
+file_path = r'E:\Data_Practice\Taxi.csv'
+df = pd.read_csv(file_path)
+
+# Display the first few rows
+print(df.head())
+
+#2.Preprocess the Data:
+# Convert event_date, hour, and minute to a datetime column
+df['datetime'] = pd.to_datetime(df['event_date'] + ' ' + df['hour'].astype(str) + ':' + df['minute'].astype(str))
+
+# Drop the original date, hour, and minute columns (if no longer needed)
+df.drop(['event_date', 'hour', 'minute'], axis=1, inplace=True)
+
+# Handling missing values if any
+df.fillna(0, inplace=True)
+
+# Check the data types and ensure everything is correct
+print(df.info())
+
+#3.Feature Engineering:
+#Create features that can help predict the pickups. These can include:
+
+#Time-based features: Extract hour, day of the week, and check if the day is a weekend or weekday.
+#Lag features: Previous pickups from the same community at similar times (to capture trends).
+#Community-level aggregation: You might want to aggregate data based on community_id and community_name.
+# Feature engineering: Create time-based features
+df['hour'] = df['datetime'].dt.hour
+df['day_of_week'] = df['datetime'].dt.dayofweek
+df['is_weekend'] = df['day_of_week'].apply(lambda x: 1 if x >= 5 else 0)
+
+# Create lag features (for predicting pickups based on previous minutes)
+df['lag_1'] = df['picks'].shift(1)
+df['lag_60'] = df['picks'].shift(60)  # Lag by 60 minutes
+
+# Drop NA values created by lag features
+df.dropna(inplace=True)
+
+# Check the updated dataframe
+print(df.head())
+
+#4. Split Data for Training and Prediction:
+
+#Since you want to predict the pickups for the current day, you can split your dataset into training and testing based on date,
+#and then use models like Random Forest, XGBoost, or ARIMA for prediction.
+from sklearn.model_selection import train_test_split
+
+# Define your features (X) and target (y)
+X = df[['hour', 'day_of_week', 'is_weekend', 'lag_1', 'lag_60']]
+y = df['picks']
+
+# Split the data into training and testing sets (train on past data, test on the current day)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+
+# Check the shapes of the train/test sets
+print(X_train.shape, X_test.shape)
+
+#5.Train a Model for Prediction:
+#You can now train a model using the training data and predict the pickups for the current day.
+#Example using XGBoost:
+
+pip install xgboost
+
+import xgboost as xgb
+
+# Initialize the model
+model = xgb.XGBRegressor()
+
+# Train the model
+model.fit(X_train, y_train)
+
+# Predict the pickups for the current day
+predictions = model.predict(X_test)
+
+# Display the predictions
+print(predictions)
+
+#6. Evaluate the Model:
+#You can evaluate the model’s performance using metrics like MAE, RMSE, or R-squared
+import xgboost as xgb
+
+# Initialize the model
+model = xgb.XGBRegressor()
+
+# Train the model
+model.fit(X_train, y_train)
+
+# Predict the pickups for the current day
+predictions = model.predict(X_test)
+
+# Display the predictions
+print(predictions)
+
+#7.Evaluate the Model:
+#You can evaluate the model’s performance using metrics like MAE, RMSE, or R-squared.
+from sklearn.metrics import root_mean_squared_error
+# Calculate and print the evaluation metrics
+mae = mean_absolute_error(y_test, predictions)
+rmse = root_mean_squared_error(y_test, predictions)
+
+print(f"MAE: {mae}, RMSE: {rmse}")
+
+
+import pandas as pd
+
+# Assuming you have the original dataframe 'df' which includes community info
+# We will merge the community information with the predictions
+
+# Recreate the 'X_test' to include community information (like community_name)
+X_test['community_id'] = df['community_id'].loc[y_test.index]
+X_test['community_name'] = df['community_name'].loc[y_test.index]
+
+# Add actual and predicted values to the test DataFrame
+X_test['actual_picks'] = y_test
+X_test['predicted_picks'] = predictions
+
+# Save the DataFrame to CSV
+save_path = r'E:\Data_Practice\Taxi_Predictions.csv'
+X_test.to_csv(save_path, index=False)
+
+print(f"Predictions saved to {save_path}")
